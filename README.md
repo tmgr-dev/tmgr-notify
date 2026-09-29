@@ -126,7 +126,6 @@ the same way). Add all three:
   "hooks": {
     "Notification": [
       {
-        "matcher": "permission_prompt|idle_prompt|agent_needs_input",
         "hooks": [
           {
             "type": "command",
