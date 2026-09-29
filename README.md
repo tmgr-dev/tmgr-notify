@@ -172,7 +172,7 @@ against the current hooks reference):
 
 - **`Notification`** (input: common fields + `message`, `title?`,
   `notification_type?`) — sends a high-priority push titled
-  `Claude Code · <basename(cwd)>` with the first line of `message` as the
+  `Claude Code · <basename(cwd)> · needs you` with the first line of `message` as the
   body. `Notification` fires for more than permission prompts (also
   `idle_prompt` after ~60s of silence, elicitations, etc.), so the body
   wording is generic ("needs your attention") rather than
@@ -190,7 +190,7 @@ against the current hooks reference):
   missing, it falls back to the last real user-prompt timestamp in the
   `transcript_path` JSONL (best-effort — the transcript can lag behind the
   in-memory conversation). If the turn lasted at least
-  `TMGR_NOTIFY_STOP_MIN_MINUTES` (default 5), sends a normal-priority push
+  `TMGR_NOTIFY_STOP_MIN_MINUTES` (default 5), sends a normal-priority push titled `Claude Code · <basename(cwd)> · done`
   with the first line of `last_assistant_message` as the body.
 
 ## Codex CLI integration

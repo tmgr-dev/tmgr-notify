@@ -31,7 +31,7 @@ export async function runHookNotification(): Promise<void> {
   const body = firstLine(input.message, 'Claude Code needs your attention.');
 
   const payload = buildPushPayload({
-    title: `Claude Code · ${project}`,
+    title: `Claude Code · ${project} · needs you`,
     body,
     priority: 'high',
     source: `claude-code:${project}`,

@@ -47,7 +47,7 @@ export async function runHookStop(): Promise<void> {
   const body = firstLine(input.last_assistant_message, 'Claude Code finished.');
 
   const payload = buildPushPayload({
-    title: `Claude Code · ${project}`,
+    title: `Claude Code · ${project} · done`,
     body,
     priority: 'normal',
     source: `claude-code:${project}`,
