@@ -11,8 +11,9 @@ or finishes a long turn.
 
 ## What's in this package
 
-- `notify_user` MCP tool, served over stdio (`tmgr-notify` / `tmgr-notify mcp`)
+- `notify_user`, `alarm` and `alarm_status` MCP tools, served over stdio (`tmgr-notify` / `tmgr-notify mcp`)
 - `tmgr-notify send` — manual one-off push from a shell, for testing
+- `tmgr-notify alarm` - ring the owner for an urgent incident (see Alarm below)
 - `tmgr-notify hook notification` — Claude Code `Notification` hook (needs
   your input / permission / idle prompt)
 - `tmgr-notify hook prompt` — Claude Code `UserPromptSubmit` hook (records
@@ -81,6 +82,72 @@ TMGR_NOTIFY_TOKEN=<TMGR_NOTIFY_TOKEN>
 
 Keep this file private (`chmod 600 ~/.config/tmgr-notify/env`) — it holds a
 bearer token.
+
+## Alarm (tmgr-alarm)
+
+`notify_user` is a soft channel. The `alarm` tool is for incidents that need
+you **now** (production down, data loss, security). The backend rings your
+phone: a silent push triggers an alarm in the mobile app, and if you do not
+acknowledge it in time (or the app never receives it) the backend places a
+voice call, where pressing `1` acknowledges. One `alarm` call is one
+escalation; the calling agent decides whether to retry. Prefer `notify_user`
+for everything else.
+
+Server requirement: for the voice-call fallback a verified alarm phone must be
+set in TMGR Settings. Without it the alarm is push-only and ends as
+`call_unavailable` if the app does not acknowledge it.
+
+Uses the same `TMGR_URL` / `TMGR_NOTIFY_TOKEN` config as `notify_user`.
+
+### MCP tools
+
+- `alarm` `{title, message, ackTimeoutSeconds?, deliveryTimeoutSeconds?, waitForResult?, maxWaitSeconds?}` -
+  creates the alarm (`POST /api/alarms`). With `waitForResult` (default `true`)
+  it long-polls (`GET /api/alarms/{id}?waitSeconds=50`) until a final status or
+  `maxWaitSeconds` (default 600) and returns the status, ack channel, call
+  status and alarm id. If the cap is reached it returns the last status with
+  `timedOut: true`. With `waitForResult: false` it returns `{id, status}` at once.
+- `alarm_status` `{id, waitSeconds?}` - re-check an alarm (long-poll up to 50 s).
+  Use it after a timeout or after `waitForResult: false`.
+
+Errors (rate limit with `retry after`, bad token, invalid input, network) come
+back as tool errors with readable text; the token is never printed.
+
+### CLI
+
+```bash
+node dist/src/cli.js alarm "prod DB is down" --title "Prod down" [--no-wait] [--ack-timeout 90] [--delivery-timeout 30]
+```
+
+Default title is `Alarm`. Prints each status change and the final status;
+the exit code is `0` only when the alarm was acknowledged (with `--no-wait`,
+`0` once the alarm is created).
+
+### Statuses
+
+Non-final: `pending`, `delivered`, `calling`. Final: `acknowledged` (channel
+`app` or `call`), `no_answer`, `busy`, `failed`, `call_unavailable`, `expired`.
+
+### Client tool-call timeouts
+
+A blocking wait can be long, so the client's MCP tool-call timeout matters
+(checked against the Claude Code MCP docs):
+
+- Claude Code CLI: `MCP_TOOL_TIMEOUT` defaults to 100000000 ms (about 28 h),
+  so the 600 s default wait fits. A per-server `timeout` in `.mcp.json`
+  overrides it as a hard wall-clock limit that progress notifications do not
+  extend. Separately, a stdio call that sends no response and no progress
+  notification for 30 minutes is aborted (`CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT`).
+- Claude Code desktop app and Cowork: reported to cancel tool calls at about
+  60 s (the MCP SDK default) regardless of `MCP_TOOL_TIMEOUT`, and not to
+  reset on progress.
+- Mitigations built in: while waiting, the server sends
+  `notifications/progress` after every poll when the client supplies a
+  `progressToken` (resets clients that honor `resetTimeoutOnProgress`). For
+  clients with a short hard cap, pass a small `maxWaitSeconds` (for example 45)
+  or `waitForResult: false`, then call `alarm_status {id, waitSeconds}` to
+  check the result. If a call times out client-side the alarm keeps running on
+  the server; re-check it with `alarm_status`.
 
 ## Claude Code integration
 

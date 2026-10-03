@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { runAlarm } from './commands/alarm.js';
 import { runHookCodex } from './commands/hook-codex.js';
 import { runHookNotification } from './commands/hook-notification.js';
 import { runHookPrompt } from './commands/hook-prompt.js';
@@ -55,6 +56,11 @@ async function main(): Promise<void> {
 
   if (cmd === 'send') {
     await runSend(argv.slice(1));
+    return;
+  }
+
+  if (cmd === 'alarm') {
+    await runAlarm(argv.slice(1));
     return;
   }
 

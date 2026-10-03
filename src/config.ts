@@ -56,6 +56,10 @@ export function buildEndpoint(baseUrl: string): string {
   return `${normalizeBaseUrl(baseUrl)}/api/notifications/push`;
 }
 
+export function buildAlarmsUrl(baseUrl: string): string {
+  return `${normalizeBaseUrl(baseUrl)}/api/alarms`;
+}
+
 export function resolveConfig(
   env: Record<string, string | undefined>,
   fallback: Record<string, string>
