@@ -79,3 +79,16 @@ test('missing message exits non-zero', async () => {
   const { code } = await run([], ['pending']);
   assert.equal(code, 1);
 });
+
+test('--no-call sends call:false', async () => {
+  let body: Record<string, unknown> = {};
+  const { code } = await run(['msg', '--no-call'], ['expired'], (b) => (body = b));
+  assert.equal(code, 1);
+  assert.equal(body.call, false);
+});
+
+test('call is omitted by default', async () => {
+  let body: Record<string, unknown> = {};
+  await run(['msg', '--no-wait'], ['pending'], (b) => (body = b));
+  assert.equal('call' in body, false);
+});

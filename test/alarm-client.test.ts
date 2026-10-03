@@ -29,12 +29,12 @@ test('createAlarm posts the body with a bearer token and unwraps {data}', async 
         assert.equal(req.method, 'POST');
         assert.equal(req.url, '/api/alarms');
         assert.equal(req.headers.authorization, 'Bearer test-token');
-        assert.deepEqual(JSON.parse(body), { title: 'T', message: 'M', ackTimeoutSeconds: 30 });
+        assert.deepEqual(JSON.parse(body), { title: 'T', message: 'M', ackTimeoutSeconds: 30, call: false });
         json(res, 201, { data: { id: 7, status: 'pending' } });
       });
     },
     async (url) => {
-      const result = await createAlarm({ title: 'T', message: 'M', ackTimeoutSeconds: 30 }, { alarmsUrl: url, token: 'test-token' });
+      const result = await createAlarm({ title: 'T', message: 'M', ackTimeoutSeconds: 30, call: false }, { alarmsUrl: url, token: 'test-token' });
       assert.deepEqual(result, { ok: true, alarm: { id: '7', status: 'pending' } });
     }
   );
@@ -143,6 +143,73 @@ test('waitForAlarm surfaces 401 with the alarm id', async () => {
         assert.equal(result.kind, 'unauthorized');
         assert.equal(result.alarmId, '5');
       }
+    }
+  );
+});
+
+test('waitForAlarm stops on expired and on no_answer', async () => {
+  for (const final of ['expired', 'no_answer']) {
+    let calls = 0;
+    await withServer(
+      (_req, res) => json(res, 200, { data: { id: 1, status: calls++ === 0 ? 'calling' : final } }),
+      async (url) => {
+        const result = await waitForAlarm('1', { alarmsUrl: url, token: 't', pollDelayMs: 0 });
+        assert.equal(result.ok && result.alarm.status, final);
+        assert.equal(calls, 2);
+      }
+    );
+  }
+});
+
+test('waitForAlarm retries 5xx and 429 then succeeds', async () => {
+  const plan = [503, 429, 'ok'];
+  let calls = 0;
+  await withServer(
+    (_req, res) => {
+      const step = plan[calls++];
+      if (step === 503) {
+        res.writeHead(503);
+        res.end();
+      } else if (step === 429) {
+        res.writeHead(429, { 'retry-after': '0' });
+        res.end();
+      } else {
+        json(res, 200, { data: { id: 1, status: 'acknowledged' } });
+      }
+    },
+    async (url) => {
+      const result = await waitForAlarm('1', { alarmsUrl: url, token: 't', pollDelayMs: 0, retryDelaysMs: [5, 5, 5] });
+      assert.equal(result.ok && result.alarm.status, 'acknowledged');
+      assert.equal(calls, 3);
+    }
+  );
+});
+
+test('waitForAlarm gives up after 3 retries and does not retry 404', async () => {
+  let calls = 0;
+  await withServer(
+    (_req, res) => {
+      calls++;
+      res.writeHead(500);
+      res.end();
+    },
+    async (url) => {
+      const result = await waitForAlarm('1', { alarmsUrl: url, token: 't', pollDelayMs: 0, retryDelaysMs: [1, 1, 1] });
+      assert.equal(result.ok, false);
+      assert.equal(calls, 4);
+    }
+  );
+  calls = 0;
+  await withServer(
+    (_req, res) => {
+      calls++;
+      res.writeHead(404);
+      res.end();
+    },
+    async (url) => {
+      const result = await waitForAlarm('1', { alarmsUrl: url, token: 't', pollDelayMs: 0, retryDelaysMs: [1, 1, 1] });
+      assert.equal(result.ok, false);
+      assert.equal(calls, 1);
     }
   );
 });

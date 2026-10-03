@@ -61,9 +61,10 @@ export function createServer(): McpServer {
         "Only for incidents that need the human NOW (production down, data loss, security). Rings the owner's phone: silent push to the app alarm, then a voice call if not acknowledged. Prefer notify_user for everything else. You decide when/whether to retry; one call = one escalation.",
       inputSchema: {
         title: z.string().min(1).max(120).describe('Alarm title, read aloud on the call'),
-        message: z.string().min(1).max(1000).describe('What happened and what is needed, read aloud on the call'),
+        message: z.string().min(1).max(500).describe('What happened and what is needed, read aloud on the call'),
         ackTimeoutSeconds: z.number().int().positive().optional().describe('Seconds to wait for an app acknowledgement before calling'),
         deliveryTimeoutSeconds: z.number().int().positive().optional().describe('Seconds to wait for the app to receive the alarm before calling'),
+        call: z.boolean().optional().describe('Voice-call fallback (default true). With false the alarm ends expired if not acknowledged in the app'),
         waitForResult: z.boolean().optional().describe('Wait for a final status (default true); false returns {id, status} immediately'),
         maxWaitSeconds: z
           .number()
@@ -73,7 +74,7 @@ export function createServer(): McpServer {
           .describe('Overall wait cap in seconds when waiting (default 600). On timeout the last status is returned with timedOut=true; re-check with alarm_status'),
       },
     },
-    async ({ title, message, ackTimeoutSeconds, deliveryTimeoutSeconds, waitForResult, maxWaitSeconds }, extra) => {
+    async ({ title, message, ackTimeoutSeconds, deliveryTimeoutSeconds, call, waitForResult, maxWaitSeconds }, extra) => {
       const { config, error } = configOrError();
       if (!config) return error;
       const opts = { alarmsUrl: buildAlarmsUrl(config.baseUrl), token: config.token };
@@ -84,6 +85,7 @@ export function createServer(): McpServer {
           message,
           ...(ackTimeoutSeconds !== undefined ? { ackTimeoutSeconds } : {}),
           ...(deliveryTimeoutSeconds !== undefined ? { deliveryTimeoutSeconds } : {}),
+          ...(call !== undefined ? { call } : {}),
         },
         opts
       );

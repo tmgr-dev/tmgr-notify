@@ -7,6 +7,7 @@ interface ParsedArgs {
   message?: string;
   title: string;
   wait: boolean;
+  call?: boolean;
   ackTimeoutSeconds?: number;
   deliveryTimeoutSeconds?: number;
   error?: string;
@@ -23,6 +24,8 @@ export function parseAlarmArgs(args: string[]): ParsedArgs {
     const arg = args[i];
     if (arg === '--no-wait') {
       out.wait = false;
+    } else if (arg === '--no-call') {
+      out.call = false;
     } else if (arg === '--title') {
       out.title = args[++i] ?? '';
     } else if (arg === '--ack-timeout' || arg === '--delivery-timeout') {
@@ -47,7 +50,7 @@ export async function executeAlarm(
   args: string[],
   config: ResolvedConfig,
   out: (line: string) => void,
-  waitOverrides: { maxWaitSeconds?: number; pollDelayMs?: number } = {}
+  waitOverrides: { maxWaitSeconds?: number; pollDelayMs?: number; retryDelaysMs?: number[] } = {}
 ): Promise<number> {
   const parsed = parseAlarmArgs(args);
   if (parsed.error || !parsed.message) {
@@ -62,6 +65,7 @@ export async function executeAlarm(
       message: parsed.message,
       ...(parsed.ackTimeoutSeconds !== undefined ? { ackTimeoutSeconds: parsed.ackTimeoutSeconds } : {}),
       ...(parsed.deliveryTimeoutSeconds !== undefined ? { deliveryTimeoutSeconds: parsed.deliveryTimeoutSeconds } : {}),
+      ...(parsed.call === false ? { call: false } : {}),
     },
     opts
   );

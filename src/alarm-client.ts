@@ -10,6 +10,7 @@ export interface WaitOptions extends AlarmClientOptions {
   maxWaitSeconds?: number;
   pollSeconds?: number;
   pollDelayMs?: number;
+  retryDelaysMs?: number[];
   onUpdate?: (alarm: AlarmInfo) => void | Promise<void>;
 }
 
@@ -18,6 +19,8 @@ const MAX_POLL_SECONDS = 50;
 const DEFAULT_MAX_WAIT_SECONDS = 600;
 const DEFAULT_POLL_DELAY_MS = 1000;
 const POLL_GRACE_MS = 10000;
+const DEFAULT_RETRY_DELAYS_MS = [1000, 2000, 4000];
+const MAX_RETRY_AFTER_MS = 10000;
 
 const TERMINAL = new Set(['acknowledged', 'no_answer', 'busy', 'failed', 'call_unavailable', 'expired']);
 
@@ -66,6 +69,7 @@ async function request(
         ok: false,
         kind: 'rate_limited',
         message: 'rate limited',
+        transient: true,
         ...(retryAfter !== undefined && Number.isFinite(retryAfter) ? { retryAfter } : {}),
       };
     }
@@ -82,11 +86,21 @@ async function request(
     if (res.status === 400) {
       return { ok: false, kind: 'validation', message: text || 'validation error' };
     }
-    return { ok: false, kind: 'error', message: `unexpected status ${res.status}${text ? `: ${text}` : ''}` };
+    return {
+      ok: false,
+      kind: 'error',
+      message: `unexpected status ${res.status}${text ? `: ${text}` : ''}`,
+      ...(res.status >= 500 ? { transient: true } : {}),
+    };
   } catch (err) {
     const name = err instanceof Error ? err.name : '';
     const isTimeout = name === 'TimeoutError' || name === 'AbortError';
-    return { ok: false, kind: 'error', message: isTimeout ? 'request timed out' : err instanceof Error ? err.message : String(err) };
+    return {
+      ok: false,
+      kind: 'error',
+      message: isTimeout ? 'request timed out' : err instanceof Error ? err.message : String(err),
+      transient: true,
+    };
   }
 }
 
@@ -109,6 +123,8 @@ export async function waitForAlarm(id: string, opts: WaitOptions): Promise<Alarm
   const pollSeconds = Math.min(MAX_POLL_SECONDS, opts.pollSeconds ?? MAX_POLL_SECONDS);
   const pollDelayMs = opts.pollDelayMs ?? DEFAULT_POLL_DELAY_MS;
   const deadline = Date.now() + maxWaitMs;
+  const retryDelays = opts.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
+  let retries = 0;
   let last: AlarmInfo | undefined;
 
   for (;;) {
@@ -116,8 +132,17 @@ export async function waitForAlarm(id: string, opts: WaitOptions): Promise<Alarm
     const waitSeconds = Math.min(pollSeconds, Math.ceil(Math.max(remainingMs, 0) / 1000));
     const startedAt = Date.now();
     const result = await getAlarm(id, waitSeconds, opts);
-    if (!result.ok) return { ...result, alarmId: id };
-
+    if (!result.ok) {
+      if (!result.transient || retries >= retryDelays.length) return { ...result, alarmId: id };
+      const delay =
+        result.kind === 'rate_limited' && result.retryAfter !== undefined
+          ? Math.min(result.retryAfter * 1000, MAX_RETRY_AFTER_MS)
+          : retryDelays[retries];
+      retries += 1;
+      await sleep(delay);
+      continue;
+    }
+    retries = 0;
     last = result.alarm;
     await opts.onUpdate?.(last);
     if (isTerminal(last.status)) return { ok: true, alarm: last, timedOut: false };

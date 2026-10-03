@@ -20,6 +20,7 @@ export interface PushFailure {
   kind: 'unauthorized' | 'rate_limited' | 'validation' | 'error';
   message: string;
   retryAfter?: number;
+  transient?: boolean;
 }
 
 export type PushResult = PushSuccess | PushFailure;
@@ -50,6 +51,7 @@ export interface AlarmRequest {
   message: string;
   ackTimeoutSeconds?: number;
   deliveryTimeoutSeconds?: number;
+  call?: boolean;
 }
 
 export interface AlarmSuccess {
