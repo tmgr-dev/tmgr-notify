@@ -10,6 +10,7 @@ interface ParsedArgs {
   call?: boolean;
   ackTimeoutSeconds?: number;
   deliveryTimeoutSeconds?: number;
+  callAttempts?: number;
   error?: string;
 }
 
@@ -33,6 +34,10 @@ export function parseAlarmArgs(args: string[]): ParsedArgs {
       if (typeof n === 'string') out.error = n;
       else if (arg === '--ack-timeout') out.ackTimeoutSeconds = n;
       else out.deliveryTimeoutSeconds = n;
+    } else if (arg === '--call-attempts') {
+      const n = parseNumber(arg, args[++i]);
+      if (typeof n === 'string' || !Number.isInteger(n) || n > 5) out.error = '--call-attempts needs an integer from 1 to 5';
+      else out.callAttempts = n;
     } else if (arg.startsWith('--')) {
       out.error = `unknown flag ${arg}`;
     } else if (out.message === undefined) {
@@ -66,6 +71,7 @@ export async function executeAlarm(
       ...(parsed.ackTimeoutSeconds !== undefined ? { ackTimeoutSeconds: parsed.ackTimeoutSeconds } : {}),
       ...(parsed.deliveryTimeoutSeconds !== undefined ? { deliveryTimeoutSeconds: parsed.deliveryTimeoutSeconds } : {}),
       ...(parsed.call === false ? { call: false } : {}),
+      ...(parsed.callAttempts !== undefined ? { callAttempts: parsed.callAttempts } : {}),
     },
     opts
   );

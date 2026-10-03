@@ -93,6 +93,13 @@ voice call, where pressing `1` acknowledges. One `alarm` call is one
 escalation; the calling agent decides whether to retry. Prefer `notify_user`
 for everything else.
 
+The voice call repeats until it is acknowledged: up to `callAttempts` calls
+(default 3, the server clamps it to 1-5). Each attempt rings for about 55 s,
+with about 20 s between attempts. Answering machines are detected and hung up,
+so voicemail never counts as an acknowledgement. On iOS, enable "Repeated
+Calls" (Settings > Focus > Do Not Disturb > Allow Calls From) so a second call
+within 3 minutes gets through Do Not Disturb.
+
 Server requirement: for the voice-call fallback a verified alarm phone must be
 set in TMGR Settings. Without it the alarm is push-only and ends as
 `call_unavailable` if the app does not acknowledge it.
@@ -101,13 +108,15 @@ Uses the same `TMGR_URL` / `TMGR_NOTIFY_TOKEN` config as `notify_user`.
 
 ### MCP tools
 
-- `alarm` `{title, message, ackTimeoutSeconds?, deliveryTimeoutSeconds?, call?, waitForResult?, maxWaitSeconds?}` -
+- `alarm` `{title, message, ackTimeoutSeconds?, deliveryTimeoutSeconds?, call?, callAttempts?, waitForResult?, maxWaitSeconds?}` -
   creates the alarm (`POST /api/alarms`). With `waitForResult` (default `true`)
   it long-polls (`GET /api/alarms/{id}?waitSeconds=50`) until a final status or
   `maxWaitSeconds` (default 600) and returns the status, ack channel, call
   status and alarm id. If the cap is reached it returns the last status with
   `timedOut: true`. With `waitForResult: false` it returns `{id, status}` at once.
-  `call` (default `true`) set to `false` skips the voice call. `message` is
+  `call` (default `true`) set to `false` skips the voice call. `callAttempts`
+  (1-5, default 3) sets how many times the call is repeated; the result
+  includes `attempts: made/max`. `message` is
   capped at 500 characters. The server clamps `deliveryTimeoutSeconds` to
   10-300 and `ackTimeoutSeconds` to 15-900. While waiting, transient network
   errors, 5xx and 429 responses are retried up to 3 times (1 s, 2 s, 4 s
@@ -121,7 +130,7 @@ back as tool errors with readable text; the token is never printed.
 ### CLI
 
 ```bash
-node dist/src/cli.js alarm "prod DB is down" --title "Prod down" [--no-wait] [--ack-timeout 90] [--delivery-timeout 30] [--no-call]
+node dist/src/cli.js alarm "prod DB is down" --title "Prod down" [--no-wait] [--ack-timeout 90] [--delivery-timeout 30] [--no-call] [--call-attempts 3]
 ```
 
 Default title is `Alarm`. `--no-call` disables the voice-call fallback (the alarm ends `expired` if not acknowledged in the app). Prints each status change and the final status;
@@ -153,6 +162,11 @@ A blocking wait can be long, so the client's MCP tool-call timeout matters
   or `waitForResult: false`, then call `alarm_status {id, waitSeconds}` to
   check the result. If a call times out client-side the alarm keeps running on
   the server; re-check it with `alarm_status`.
+
+The default wait cap of 600 s is not lower than a full default escalation:
+3 attempts x (55 s + 20 s) plus the delivery and ack timeouts is about 6 min.
+5 attempts take about 9 min, so with long timeouts pass a larger
+`maxWaitSeconds` (the cap is 3600).
 
 ## Claude Code integration
 

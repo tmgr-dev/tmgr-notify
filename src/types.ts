@@ -43,6 +43,8 @@ export interface AlarmInfo {
   acknowledgedAt?: string | null;
   ackChannel?: 'app' | 'call' | string | null;
   callStatus?: string | null;
+  callAttempts?: number | null;
+  callAttemptsMade?: number | null;
   createdAt?: string | null;
 }
 
@@ -52,6 +54,7 @@ export interface AlarmRequest {
   ackTimeoutSeconds?: number;
   deliveryTimeoutSeconds?: number;
   call?: boolean;
+  callAttempts?: number;
 }
 
 export interface AlarmSuccess {

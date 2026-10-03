@@ -92,3 +92,23 @@ test('call is omitted by default', async () => {
   await run(['msg', '--no-wait'], ['pending'], (b) => (body = b));
   assert.equal('call' in body, false);
 });
+
+test('--call-attempts is parsed and sent', async () => {
+  assert.equal(parseAlarmArgs(['m', '--call-attempts', '4']).callAttempts, 4);
+  let body: Record<string, unknown> = {};
+  await run(['msg', '--no-wait', '--call-attempts', '2'], ['pending'], (b) => (body = b));
+  assert.equal(body.callAttempts, 2);
+});
+
+test('--call-attempts rejects values outside 1..5', () => {
+  for (const v of ['0', '6', '1.5', 'x']) {
+    assert.match(parseAlarmArgs(['m', '--call-attempts', v]).error ?? '', /--call-attempts/);
+  }
+  assert.match(parseAlarmArgs(['m', '--call-attempts']).error ?? '', /--call-attempts/);
+});
+
+test('callAttempts is omitted by default', async () => {
+  let body: Record<string, unknown> = {};
+  await run(['msg', '--no-wait'], ['pending'], (b) => (body = b));
+  assert.equal('callAttempts' in body, false);
+});

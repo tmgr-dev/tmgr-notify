@@ -4,6 +4,9 @@ export function formatAlarm(alarm: AlarmInfo, timedOut = false): string {
   const parts = [`alarm ${alarm.id}: ${alarm.status}`];
   if (alarm.ackChannel) parts.push(`channel: ${alarm.ackChannel}`);
   parts.push(`call: ${alarm.callStatus ?? 'none'}`);
+  if (typeof alarm.callAttempts === 'number' && typeof alarm.callAttemptsMade === 'number') {
+    parts.push(`attempts: ${alarm.callAttemptsMade}/${alarm.callAttempts}`);
+  }
   if (timedOut) parts.push('timedOut: true (still not final, re-check with alarm_status)');
   return parts.join(', ');
 }
