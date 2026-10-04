@@ -1,18 +1,46 @@
 {
   "name": "tmgr-notify",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.2.0",
+  "mcpName": "io.github.tmgr-dev/tmgr-notify",
   "type": "module",
-  "description": "Standalone MCP server + Claude Code / Codex hook CLI for TMGR phone push notifications",
+  "description": "MCP server and Claude Code / Codex hook CLI: phone push notifications and urgent alarms for AI agents via TMGR",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "claude-code",
+    "codex",
+    "notifications",
+    "push",
+    "alarm",
+    "ai-agents",
+    "tmgr"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tmgr-dev/tmgr-notify.git"
+  },
+  "homepage": "https://github.com/tmgr-dev/tmgr-notify#readme",
+  "bugs": {
+    "url": "https://github.com/tmgr-dev/tmgr-notify/issues"
+  },
+  "license": "MIT",
   "bin": {
     "tmgr-notify": "dist/src/cli.js"
   },
+  "files": [
+    "dist/src",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "build": "tsc && chmod +x dist/src/cli.js",
-    "test": "npm run build && node --test \"dist/test/*.test.js\""
+    "test": "npm run build && node --test \"dist/test/*.test.js\"",
+    "prepublishOnly": "npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",

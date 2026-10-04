@@ -8,7 +8,7 @@ import { sendPush } from './http-client.js';
 import { buildPushPayload } from './payload.js';
 
 export function createServer(): McpServer {
-  const server = new McpServer({ name: 'tmgr-notify', version: '0.1.0' });
+  const server = new McpServer({ name: 'tmgr-notify', version: '0.2.0' });
 
   server.registerTool(
     'notify_user',
