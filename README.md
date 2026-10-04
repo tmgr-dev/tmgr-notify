@@ -1,8 +1,8 @@
-# tmgr-notify
+# @tmgr/notify
 
 MCP server and Claude Code / Codex hook CLI that lets an AI agent reach you on your phone.
 
-[TMGR](https://tmgr.dev) is a task manager with an iOS app. With `tmgr-notify` an agent (Claude Code, Codex, or any MCP client) gets three tools:
+[TMGR](https://tmgr.dev) is a task manager with an iOS app. With `@tmgr/notify` (command `tmgr-notify`) an agent (Claude Code, Codex, or any MCP client) gets three tools:
 
 - `notify_user` sends a push notification.
 - `alarm` rings you for an urgent incident: an alarm in the app, then a voice call if you do not acknowledge it.
@@ -49,13 +49,13 @@ Register it once at user scope so it is available in every project:
 claude mcp add -s user tmgr-notify \
   -e TMGR_URL=https://api.tmgr.dev \
   -e TMGR_NOTIFY_TOKEN=<TMGR_NOTIFY_TOKEN> \
-  -- npx -y tmgr-notify mcp
+  -- npx -y @tmgr/notify mcp
 ```
 
 To keep the token out of `~/.claude.json`, skip the `-e` flags and rely on the env file above:
 
 ```bash
-claude mcp add -s user tmgr-notify -- npx -y tmgr-notify mcp
+claude mcp add -s user tmgr-notify -- npx -y @tmgr/notify mcp
 ```
 
 Or add it to a project's `.mcp.json`:
@@ -66,7 +66,7 @@ Or add it to a project's `.mcp.json`:
     "tmgr-notify": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "tmgr-notify", "mcp"]
+      "args": ["-y", "@tmgr/notify", "mcp"]
     }
   }
 }
@@ -84,21 +84,21 @@ Hooks live in `~/.claude/settings.json` (user scope shown, project scope works t
     "Notification": [
       {
         "hooks": [
-          { "type": "command", "command": "npx -y tmgr-notify hook notification" }
+          { "type": "command", "command": "npx -y @tmgr/notify hook notification" }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "npx -y tmgr-notify hook prompt" }
+          { "type": "command", "command": "npx -y @tmgr/notify hook prompt" }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "npx -y tmgr-notify hook stop" }
+          { "type": "command", "command": "npx -y @tmgr/notify hook stop" }
         ]
       }
     ]
@@ -106,7 +106,7 @@ Hooks live in `~/.claude/settings.json` (user scope shown, project scope works t
 }
 ```
 
-`npx` adds startup latency to every hook run. For faster hooks install the package globally with `npm i -g tmgr-notify` and use `tmgr-notify hook ...` as the command.
+`npx` adds startup latency to every hook run. For faster hooks install the package globally with `npm i -g @tmgr/notify` and use `tmgr-notify hook ...` as the command.
 
 `UserPromptSubmit` and `Stop` do not support a `matcher`. They fire on every prompt and turn, which is what the `hook prompt` / `hook stop` pair needs to measure turn duration.
 
@@ -125,7 +125,7 @@ Every hook subcommand always exits `0` and writes nothing to stdout, so a miscon
 Codex's `notify` hook is user-level only (`~/.codex/config.toml`); a project's `.codex/config.toml` cannot set it. Codex runs the program with the event JSON as the final argv argument (not stdin), for the `agent-turn-complete` event:
 
 ```toml
-notify = ["npx", "-y", "tmgr-notify", "hook", "codex"]
+notify = ["npx", "-y", "@tmgr/notify", "hook", "codex"]
 ```
 
 To also let Codex call the tools directly:
@@ -133,14 +133,15 @@ To also let Codex call the tools directly:
 ```toml
 [mcp_servers.tmgr-notify]
 command = "npx"
-args = ["-y", "tmgr-notify", "mcp"]
+args = ["-y", "@tmgr/notify", "mcp"]
+tool_timeout_sec = 660
 
 [mcp_servers.tmgr-notify.env]
 TMGR_URL = "https://api.tmgr.dev"
 TMGR_NOTIFY_TOKEN = "<TMGR_NOTIFY_TOKEN>"
 ```
 
-Omit the `env` table to rely on `~/.config/tmgr-notify/env` instead of putting the token in `config.toml`.
+Codex cancels MCP tool calls after 60 s by default, while `alarm` waits up to 600 s; `tool_timeout_sec = 660` keeps the result. Omit the `env` table to rely on `~/.config/tmgr-notify/env` instead of putting the token in `config.toml`.
 
 `hook codex` sends a normal-priority push titled `Codex · <project>` with the first line of `last-assistant-message` as the body, only when `type` is `agent-turn-complete`.
 
@@ -211,21 +212,21 @@ A full default escalation (3 attempts) takes about 6 minutes; 5 attempts take ab
 ## CLI
 
 ```bash
-npx -y tmgr-notify send --title "Deploy finished" --body "v1.2.3 is live" --priority high [--link https://example.com]
+npx -y @tmgr/notify send --title "Deploy finished" --body "v1.2.3 is live" --priority high [--link https://example.com]
 ```
 
 Exits non-zero and prints an `error: ...` line on failure (auth, validation, rate limit, timeout, network).
 
 ```bash
-npx -y tmgr-notify alarm "prod DB is down" --title "Prod down" [--no-wait] [--ack-timeout 90] [--delivery-timeout 30] [--no-call] [--call-attempts 3]
+npx -y @tmgr/notify alarm "prod DB is down" --title "Prod down" [--no-wait] [--ack-timeout 90] [--delivery-timeout 30] [--no-call] [--call-attempts 3]
 ```
 
 The default title is `Alarm`. `--no-call` disables the voice-call fallback. It prints each status change and the final status. The exit code is `0` only when the alarm was acknowledged (with `--no-wait`, `0` once the alarm is created).
 
 ```bash
-npx -y tmgr-notify mcp                       # MCP server over stdio (also the default with no arguments)
-npx -y tmgr-notify hook notification|prompt|stop   # Claude Code hooks, payload on stdin
-npx -y tmgr-notify hook codex '<event json>'       # Codex notify, payload as last argument
+npx -y @tmgr/notify mcp                       # MCP server over stdio (also the default with no arguments)
+npx -y @tmgr/notify hook notification|prompt|stop   # Claude Code hooks, payload on stdin
+npx -y @tmgr/notify hook codex '<event json>'       # Codex notify, payload as last argument
 ```
 
 To test the backend independently of this CLI:

@@ -1,5 +1,5 @@
 {
-  "name": "tmgr-notify",
+  "name": "@tmgr/notify",
   "version": "0.2.0",
   "mcpName": "io.github.tmgr-dev/tmgr-notify",
   "type": "module",
@@ -25,6 +25,9 @@
     "url": "https://github.com/tmgr-dev/tmgr-notify/issues"
   },
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "tmgr-notify": "dist/src/cli.js"
   },
