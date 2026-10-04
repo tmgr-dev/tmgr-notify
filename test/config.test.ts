@@ -44,8 +44,22 @@ test('resolveConfig: throws ConfigError when the token is missing', () => {
   assert.throws(() => resolveConfig({ TMGR_URL: 'https://env.test' }, {}), ConfigError);
 });
 
-test('resolveConfig: throws ConfigError when the URL is missing', () => {
-  assert.throws(() => resolveConfig({ TMGR_NOTIFY_TOKEN: 'env-token' }, {}), ConfigError);
+test('resolveConfig: the missing-token error does not mention the URL', () => {
+  assert.throws(
+    () => resolveConfig({}, {}),
+    (err: unknown) => err instanceof ConfigError && /TMGR_NOTIFY_TOKEN/.test(err.message) && !/TMGR_URL/.test(err.message)
+  );
+});
+
+test('resolveConfig: defaults the URL to https://api.tmgr.dev when unset', () => {
+  const cfg = resolveConfig({ TMGR_NOTIFY_TOKEN: 'env-token' }, {});
+  assert.equal(cfg.baseUrl, 'https://api.tmgr.dev');
+});
+
+test('resolveConfig: the file URL overrides the default', () => {
+  const cfg = resolveConfig({ TMGR_NOTIFY_TOKEN: 'env-token' }, { TMGR_URL: 'http://localhost:8080/api' });
+  assert.equal(cfg.baseUrl, 'http://localhost:8080/api');
+  assert.equal(buildEndpoint(cfg.baseUrl), 'http://localhost:8080/api/notifications/push');
 });
 
 test('resolveConfig: defaults stopMinMinutes to 5', () => {

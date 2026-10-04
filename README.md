@@ -26,14 +26,13 @@ Configuration is read from environment variables first, then from a fallback fil
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `TMGR_URL` | yes | API base URL, e.g. `https://api.tmgr.dev`. A base that already ends in `/api` is normalized. |
+| `TMGR_URL` | no | API base URL, default `https://api.tmgr.dev`. Override it for a self-hosted or local TMGR. A base that already ends in `/api` is normalized. |
 | `TMGR_NOTIFY_TOKEN` | yes | The `tmgrn_...` token. Sent as `Authorization: Bearer <token>`. |
 | `TMGR_NOTIFY_STOP_MIN_MINUTES` | no | Minimum turn duration in minutes before `hook stop` sends a "finished" push. Default `5`. |
 
 If a variable is not set, `tmgr-notify` reads it from `~/.config/tmgr-notify/env`, one `KEY=VALUE` per line, `#` comments allowed:
 
 ```
-TMGR_URL=https://api.tmgr.dev
 TMGR_NOTIFY_TOKEN=<TMGR_NOTIFY_TOKEN>
 ```
 
@@ -47,12 +46,11 @@ Register it once at user scope so it is available in every project:
 
 ```bash
 claude mcp add -s user tmgr-notify \
-  -e TMGR_URL=https://api.tmgr.dev \
   -e TMGR_NOTIFY_TOKEN=<TMGR_NOTIFY_TOKEN> \
   -- npx -y @tmgr/notify mcp
 ```
 
-To keep the token out of `~/.claude.json`, skip the `-e` flags and rely on the env file above:
+To keep the token out of `~/.claude.json`, skip the `-e` flag and rely on the env file above:
 
 ```bash
 claude mcp add -s user tmgr-notify -- npx -y @tmgr/notify mcp
@@ -137,7 +135,6 @@ args = ["-y", "@tmgr/notify", "mcp"]
 tool_timeout_sec = 660
 
 [mcp_servers.tmgr-notify.env]
-TMGR_URL = "https://api.tmgr.dev"
 TMGR_NOTIFY_TOKEN = "<TMGR_NOTIFY_TOKEN>"
 ```
 

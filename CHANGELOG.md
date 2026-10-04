@@ -8,3 +8,4 @@ First public release. Version 0.1.0 was internal-only and never published.
 - Claude Code hooks: `hook notification`, `hook prompt`, `hook stop`.
 - Codex notify hook: `hook codex`.
 - CLI: `send` for a manual push, `alarm` for an urgent alarm.
+- `TMGR_URL` is optional and defaults to `https://api.tmgr.dev`; only `TMGR_NOTIFY_TOKEN` is required.

@@ -11,6 +11,7 @@ export interface ResolvedConfig {
 export class ConfigError extends Error {}
 
 const DEFAULT_STOP_MIN_MINUTES = 5;
+const DEFAULT_BASE_URL = 'https://api.tmgr.dev';
 
 export function parseEnvFile(content: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -64,11 +65,8 @@ export function resolveConfig(
   env: Record<string, string | undefined>,
   fallback: Record<string, string>
 ): ResolvedConfig {
-  const baseUrl = env.TMGR_URL || fallback.TMGR_URL;
+  const baseUrl = env.TMGR_URL || fallback.TMGR_URL || DEFAULT_BASE_URL;
   const token = env.TMGR_NOTIFY_TOKEN || fallback.TMGR_NOTIFY_TOKEN;
-  if (!baseUrl) {
-    throw new ConfigError('TMGR_URL is not set (env var or ~/.config/tmgr-notify/env)');
-  }
   if (!token) {
     throw new ConfigError('TMGR_NOTIFY_TOKEN is not set (env var or ~/.config/tmgr-notify/env)');
   }

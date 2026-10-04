@@ -18,8 +18,8 @@
       "environmentVariables": [
         {
           "name": "TMGR_URL",
-          "description": "TMGR API base URL, e.g. https://api.tmgr.dev",
-          "isRequired": true,
+          "description": "TMGR API base URL, default https://api.tmgr.dev; override for a self-hosted or local TMGR",
+          "isRequired": false,
           "isSecret": false
         },
         {
