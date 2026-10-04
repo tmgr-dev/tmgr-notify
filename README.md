@@ -20,6 +20,8 @@ The package also ships hooks that notify you automatically when Claude Code need
 
 In TMGR open **Settings → Agent notifications → Create token**. The token (`tmgrn_...`) is shown once, so copy it right away. You can revoke it from the same screen.
 
+After you create a token, TMGR shows ready-to-paste setup for Claude Code, Codex, Cursor and hooks with the token filled in. The same steps are in the [agent setup guide](https://tmgr.dev/docs/agents).
+
 ## Configuration
 
 Configuration is read from environment variables first, then from a fallback file. Environment variables always win.
