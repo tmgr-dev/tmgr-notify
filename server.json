@@ -1,0 +1,34 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.tmgr-dev/tmgr-notify",
+  "description": "Phone push notifications and urgent alarms for AI agents via TMGR.",
+  "repository": {
+    "url": "https://github.com/tmgr-dev/tmgr-notify",
+    "source": "github"
+  },
+  "version": "0.2.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "tmgr-notify",
+      "version": "0.2.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "TMGR_URL",
+          "description": "TMGR API base URL, e.g. https://api.tmgr.dev",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "TMGR_NOTIFY_TOKEN",
+          "description": "notify token from TMGR Settings → Agent notifications",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
