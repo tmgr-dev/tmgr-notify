@@ -25,26 +25,9 @@ jobs:
             echo "Tag ${GITHUB_REF_NAME} does not match package.json version" >&2
             exit 1
           fi
-      - name: Build platform packages
-        run: node dist/tools/build-platform-packages.js --out dist-npm
-      - name: Publish platform packages
-        run: |
-          set -eu
-          version="$(node -p "require('./package.json').version")"
-          for dir in dist-npm/*/; do
-            name="$(node -p "require('./${dir}package.json').name")"
-            if [ "$(npm view "${name}@${version}" version 2>/dev/null || true)" = "$version" ]; then
-              echo "${name}@${version} already published, skipping"
-              continue
-            fi
-            (cd "$dir" && npm publish --provenance --access public)
-          done
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish main package
         run: |
           set -eu
-          node dist/tools/build-platform-packages.js --add-optional-deps
           version="$(node -p "require('./package.json').version")"
           if [ "$(npm view "@tmgr/notify@${version}" version 2>/dev/null || true)" = "$version" ]; then
             echo "@tmgr/notify@${version} already published, skipping"

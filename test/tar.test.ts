@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractFiles } from "../tools/tar.js";
-import { makeTar, tarHeader } from "./tools-tar-helper.js";
+import { extractFiles } from "../src/tar.js";
+import { makeTar, tarHeader } from "./tar-helper.js";
 
 const NAME = "tmgr-1.0.1-x/tmgr";
 const body = Buffer.from("binary-bytes");

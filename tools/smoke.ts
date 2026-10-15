@@ -1,9 +1,9 @@
 import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildPlatform, loadInputs } from "./build-platform-packages.js";
+import { cliPath, hashFile, type Release } from "../src/download.js";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const REQUIRED_TOOLS = ["notify_user", "alarm", "alarm_status", "tmgr_cli"];
@@ -22,24 +22,30 @@ function pack(cwd: string, destination: string): string {
   return join(destination, name);
 }
 
-function cleanEnv(home: string): NodeJS.ProcessEnv {
-  return { HOME: home, PATH: `${dirname(process.execPath)}:/usr/bin:/bin` };
+interface Sandbox {
+  home: string;
+  cache: string;
 }
 
-function runCli(bin: string, args: string[], home: string): string {
-  return execFileSync(bin, args, {
-    env: cleanEnv(home),
-    encoding: "utf8",
-    timeout: STEP_TIMEOUT_MS,
-  }).trim();
+function cleanEnv(box: Sandbox): NodeJS.ProcessEnv {
+  return { HOME: box.home, XDG_CACHE_HOME: box.cache, PATH: `${dirname(process.execPath)}:/usr/bin:/bin` };
 }
 
-function mcpSession(bin: string, home: string): Promise<string[]> {
+function runCli(bin: string, args: string[], box: Sandbox): string {
+  return execFileSync(bin, args, { env: cleanEnv(box), encoding: "utf8", timeout: STEP_TIMEOUT_MS }).trim();
+}
+
+interface Session {
+  tools: string[];
+  stderr: string;
+}
+
+function mcpSession(bin: string, box: Sandbox): Promise<Session> {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, ["mcp"], { env: cleanEnv(home), stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(bin, ["mcp"], { env: cleanEnv(box), stdio: ["pipe", "pipe", "pipe"] });
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-      reject(new Error("mcp session timed out"));
+      reject(new Error(`mcp session timed out: ${stderr}`));
     }, STEP_TIMEOUT_MS);
     let stdout = "";
     let stderr = "";
@@ -77,7 +83,7 @@ function mcpSession(bin: string, home: string): Promise<string[]> {
       clearTimeout(timer);
       if (!tools) reject(new Error(`mcp exited (${code}) without tools/list: ${stderr}`));
       else if (code !== 0) reject(new Error(`mcp exited with ${code}: ${stderr}`));
-      else resolve(tools);
+      else resolve({ tools, stderr });
     });
 
     send({
@@ -93,13 +99,35 @@ function mcpSession(bin: string, home: string): Promise<string[]> {
   });
 }
 
-async function verifyInstall(label: string, projectDir: string, home: string): Promise<void> {
-  const bin = join(projectDir, "node_modules", ".bin", "tmgr-notify");
-  log(`${label}: version ${runCli(bin, ["--version"], home)}`);
-  const tools = await mcpSession(bin, home);
-  const missing = REQUIRED_TOOLS.filter((name) => !tools.includes(name));
+function checkTools(label: string, session: Session): void {
+  const missing = REQUIRED_TOOLS.filter((name) => !session.tools.includes(name));
   if (missing.length > 0) throw new Error(`${label}: missing tools ${missing.join(", ")}`);
-  log(`${label}: mcp ok (${tools.join(", ")})`);
+}
+
+async function verifyInstall(label: string, projectDir: string, base: string, release: Release): Promise<void> {
+  const bin = join(projectDir, "node_modules", ".bin", "tmgr-notify");
+  const box: Sandbox = { home: join(base, `${label}-home`), cache: join(base, `${label}-cache`) };
+  mkdirSync(box.home);
+  mkdirSync(box.cache);
+  log(`${label}: version ${runCli(bin, ["--version"], box)}`);
+
+  const [a, b] = await Promise.all([mcpSession(bin, box), mcpSession(bin, box)]);
+  checkTools(`${label} first run A`, a);
+  checkTools(`${label} first run B`, b);
+  log(`${label}: two concurrent cold runs ok (${a.tools.join(", ")})`);
+
+  const pinned = release.platforms[`${process.platform}-${process.arch}`];
+  const path = cliPath(box.cache, release, pinned);
+  const files = readdirSync(dirname(path));
+  if (files.length !== 1 || files[0] !== "tmgr") throw new Error(`${label}: unexpected cache contents ${files.join(", ")}`);
+  const actual = await hashFile(path);
+  if (actual !== pinned.binarySha256) throw new Error(`${label}: cached binary hash ${actual} != pinned ${pinned.binarySha256}`);
+  log(`${label}: cache holds exactly one tmgr, sha256 matches pin`);
+
+  const warm = await mcpSession(bin, box);
+  checkTools(`${label} warm run`, warm);
+  if (/downloading/.test(warm.stderr)) throw new Error(`${label}: warm run downloaded again: ${warm.stderr}`);
+  log(`${label}: warm run ok, no download`);
 }
 
 function newProject(base: string, name: string): string {
@@ -110,53 +138,37 @@ function newProject(base: string, name: string): string {
 }
 
 async function run(base: string): Promise<void> {
-  const { release, packageVersion } = await loadInputs();
+  const release = JSON.parse(readFileSync(join(ROOT, "cli-release.json"), "utf8")) as Release;
   const key = `${process.platform}-${process.arch}`;
   if (!release.platforms[key]) {
     log(`no binary for ${key}, skipping`);
     return;
   }
 
-  const home = join(base, "home");
-  mkdirSync(home);
   const tgzDir = join(base, "tgz");
   mkdirSync(tgzDir);
-
-  const platformDir = await buildPlatform({
-    key,
-    release,
-    packageVersion,
-    outDir: join(base, "dist-npm"),
-  });
-  const platformTgz = pack(platformDir, tgzDir);
   const mainTgz = pack(ROOT, tgzDir);
-  log(`packed ${platformTgz} and ${mainTgz}`);
+  log(`packed ${mainTgz}`);
 
   const npmProject = newProject(base, "npm-project");
-  execFileSync(
-    "npm",
-    ["install", "--ignore-scripts", "--no-audit", "--no-fund", mainTgz, platformTgz],
-    { cwd: npmProject, stdio: "inherit" },
-  );
-  await verifyInstall("npm", npmProject, home);
+  execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", mainTgz], {
+    cwd: npmProject,
+    stdio: "inherit",
+  });
+  await verifyInstall("npm", npmProject, base, release);
 
-  let pnpmAvailable = true;
   try {
     execFileSync("pnpm", ["--version"], { stdio: "ignore" });
   } catch {
-    pnpmAvailable = false;
-  }
-  if (!pnpmAvailable) {
     log("pnpm not found, skipping pnpm check");
     return;
   }
   const pnpmProject = newProject(base, "pnpm-project");
-  execFileSync(
-    "pnpm",
-    ["add", "--ignore-scripts", "--store-dir", join(base, "pnpm-store"), mainTgz, platformTgz],
-    { cwd: pnpmProject, stdio: "inherit" },
-  );
-  await verifyInstall("pnpm", pnpmProject, home);
+  execFileSync("pnpm", ["add", "--ignore-scripts", "--store-dir", join(base, "pnpm-store"), mainTgz], {
+    cwd: pnpmProject,
+    stdio: "inherit",
+  });
+  await verifyInstall("pnpm", pnpmProject, base, release);
 }
 
 async function main(): Promise<void> {

@@ -250,3 +250,23 @@ test('hook mode drops child stdout', async () => {
   assert.equal(res.code, 0);
   assert.equal(res.stdout.length, 0);
 });
+
+test('offline first run: mcp exits 1 with a hint, hook exits 0, stdout stays empty', async () => {
+  const preload = join(mkdtempSync(join(root, 'preload-')), 'offline.mjs');
+  writeFileSync(preload, "globalThis.fetch = async () => { throw new TypeError('fetch failed'); };\n");
+  const env = () =>
+    baseEnv([], {
+      PATH: mkdtempSync(join(root, 'emptybin-')),
+      XDG_CACHE_HOME: mkdtempSync(join(root, 'xdg-')),
+      NODE_OPTIONS: `--import=${preload}`,
+    });
+  const mcp = await run(['mcp'], env());
+  assert.equal(mcp.code, 1);
+  assert.equal(mcp.stdout.length, 0);
+  assert.match(mcp.stderr, /TMGR_BIN/);
+  assert.match(mcp.stderr, /releases\/tag\//);
+  const hook = await run(['hook', 'stop'], env());
+  assert.equal(hook.code, 0);
+  assert.equal(hook.stdout.length, 0);
+  assert.match(hook.stderr, /TMGR_BIN/);
+});

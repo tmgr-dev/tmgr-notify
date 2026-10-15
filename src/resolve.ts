@@ -1,22 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { accessSync, chmodSync, constants, createReadStream, readFileSync, statSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { delimiter, dirname, isAbsolute, join } from 'node:path';
+import { accessSync, constants, readFileSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { delimiter, isAbsolute, join } from 'node:path';
+import { ensureCli, hashFile, type DownloadOptions, type PlatformRelease, type Release } from './download.js';
 
-export interface PlatformRelease {
-  binarySha256: string;
-}
+export { ChecksumError, DownloadError, type PlatformRelease, type Release } from './download.js';
 
-export interface Release {
-  repo: string;
-  tag: string;
-  version: string;
-  minVersion: string;
-  platforms: Record<string, PlatformRelease>;
-}
-
-export type BinarySource = 'TMGR_BIN' | 'PATH' | 'package';
+export type BinarySource = 'TMGR_BIN' | 'PATH' | 'cache';
 
 export interface ResolvedBinary {
   path: string;
@@ -30,17 +20,12 @@ export interface ResolveDeps {
   release: Release;
   isFile(path: string): boolean;
   isExecutable(path: string): boolean;
-  mode(path: string): number;
-  chmod(path: string, mode: number): void;
   versionOutput(path: string): string | undefined;
-  packageDir(pkg: string): string | undefined;
-  sha256(path: string): Promise<string>;
+  ensureCli(release: Release, pinned: PlatformRelease): Promise<string>;
   debug(message: string): void;
 }
 
 export class UnsupportedPlatformError extends Error {}
-export class MissingBinaryError extends Error {}
-export class ChecksumError extends Error {}
 export class BinaryOverrideError extends Error {}
 
 const VERSION_RE = /^tmgr (\d+)\.(\d+)\.(\d+)(?:[-+]\S*)?\s*$/;
@@ -99,32 +84,27 @@ export async function resolveBinary(deps: ResolveDeps): Promise<ResolvedBinary> 
     );
   }
 
-  const dir = deps.packageDir(`@tmgr/notify-${key}`);
-  if (!dir) {
-    throw new MissingBinaryError(
-      `The platform package @tmgr/notify-${key} is not installed (probably installed with --omit=optional or --no-optional). ` +
-        `Reinstall @tmgr/notify with optional dependencies, install the tmgr CLI from ${releaseUrl}, or set TMGR_BIN.`,
-    );
-  }
-  const path = join(dir, 'bin', 'tmgr');
-  if (!deps.isFile(path)) {
-    throw new MissingBinaryError(`The platform package @tmgr/notify-${key} has no bin/tmgr. Reinstall @tmgr/notify or set TMGR_BIN.`);
-  }
-
-  const actual = await deps.sha256(path);
-  if (actual !== pinned.binarySha256) {
-    throw new ChecksumError(`${path} failed the SHA-256 check, refusing to run it (expected ${pinned.binarySha256}, got ${actual})`);
-  }
-  if ((deps.mode(path) & 0o111) === 0) deps.chmod(path, 0o755);
-  return { path, source: 'package' };
+  return { path: await deps.ensureCli(deps.release, pinned), source: 'cache' };
 }
 
 export function loadRelease(): Release {
   return JSON.parse(readFileSync(new URL('../../cli-release.json', import.meta.url), 'utf8')) as Release;
 }
 
+export function cacheRoot(env: NodeJS.ProcessEnv): string {
+  const xdg = env.XDG_CACHE_HOME;
+  return xdg && isAbsolute(xdg) ? xdg : join(homedir(), '.cache');
+}
+
 export function defaultDeps(env: NodeJS.ProcessEnv = process.env): ResolveDeps {
-  const require = createRequire(import.meta.url);
+  const download: DownloadOptions = {
+    fetch: (url, init) => fetch(url, init),
+    cacheRoot: cacheRoot(env),
+    timeoutMs: 120_000,
+    maxBytes: 64 * 1024 * 1024,
+    log: (m) => process.stderr.write(`tmgr-notify: ${m}\n`),
+    hashFile,
+  };
   return {
     env,
     platform: process.platform,
@@ -145,27 +125,11 @@ export function defaultDeps(env: NodeJS.ProcessEnv = process.env): ResolveDeps {
         return false;
       }
     },
-    mode: (p) => statSync(p).mode,
-    chmod: (p, m) => chmodSync(p, m),
     versionOutput: (p) => {
       const r = spawnSync(p, ['--version'], { timeout: 3000, encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
       return r.error || r.status !== 0 ? undefined : r.stdout;
     },
-    packageDir: (pkg) => {
-      try {
-        return dirname(require.resolve(`${pkg}/package.json`));
-      } catch {
-        return undefined;
-      }
-    },
-    sha256: (p) =>
-      new Promise((resolve, reject) => {
-        const hash = createHash('sha256');
-        createReadStream(p)
-          .on('data', (c) => hash.update(c))
-          .on('error', reject)
-          .on('end', () => resolve(hash.digest('hex')));
-      }),
+    ensureCli: (release, pinned) => ensureCli(release, pinned, download),
     debug: (m) => {
       if (env.TMGR_NOTIFY_DEBUG) process.stderr.write(`tmgr-notify: ${m}\n`);
     },
