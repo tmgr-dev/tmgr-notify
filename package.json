@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "mcpName": "io.github.tmgr-dev/tmgr-notify",
   "type": "module",
-  "description": "MCP server and Claude Code / Codex hook CLI: phone push notifications and urgent alarms for AI agents via TMGR",
+  "description": "Thin launcher for the tmgr CLI: MCP server and Claude Code / Codex hooks for phone push notifications and urgent alarms for AI agents via TMGR",
   "keywords": [
     "mcp",
     "mcp-server",
@@ -33,6 +33,7 @@
   },
   "files": [
     "dist/src",
+    "cli-release.json",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
@@ -45,9 +46,11 @@
     "test": "npm run build && node --test \"dist/test/*.test.js\"",
     "prepublishOnly": "npm test"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.31.0",
-    "zod": "^4.6.5"
+  "optionalDependencies": {
+    "@tmgr/notify-darwin-arm64": "0.2.0",
+    "@tmgr/notify-darwin-x64": "0.2.0",
+    "@tmgr/notify-linux-arm64": "0.2.0",
+    "@tmgr/notify-linux-x64": "0.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
