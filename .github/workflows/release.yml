@@ -25,6 +25,30 @@ jobs:
             echo "Tag ${GITHUB_REF_NAME} does not match package.json version" >&2
             exit 1
           fi
+      - name: Check optionalDependencies match package version
+        run: |
+          node -e '
+            const p = require("./package.json");
+            const bad = Object.entries(p.optionalDependencies ?? {}).filter(([, v]) => v !== p.version);
+            if (bad.length === 0 && Object.keys(p.optionalDependencies ?? {}).length === 0) bad.push(["optionalDependencies", "missing"]);
+            if (bad.length) { console.error("optionalDependencies out of sync:", bad); process.exit(1); }
+          '
+      - name: Build platform packages
+        run: node dist/tools/build-platform-packages.js --out dist-npm
+      - name: Publish platform packages
+        run: |
+          set -eu
+          version="$(node -p "require('./package.json').version")"
+          for dir in dist-npm/*/; do
+            name="$(node -p "require('./${dir}package.json').name")"
+            if [ "$(npm view "${name}@${version}" version 2>/dev/null || true)" = "$version" ]; then
+              echo "${name}@${version} already published, skipping"
+              continue
+            fi
+            (cd "$dir" && npm publish --provenance --access public)
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
