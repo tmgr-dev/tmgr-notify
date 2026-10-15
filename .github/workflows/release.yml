@@ -49,6 +49,14 @@ jobs:
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - run: npm publish --provenance --access public
+      - name: Publish main package
+        run: |
+          set -eu
+          version="$(node -p "require('./package.json').version")"
+          if [ "$(npm view "@tmgr/notify@${version}" version 2>/dev/null || true)" = "$version" ]; then
+            echo "@tmgr/notify@${version} already published, skipping"
+            exit 0
+          fi
+          npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

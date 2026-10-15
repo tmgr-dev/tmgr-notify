@@ -17,6 +17,7 @@ const fs = require('node:fs');
 const args = process.argv.slice(2);
 if (args[0] === '--version') { console.log('tmgr 1.0.1'); process.exit(0); }
 if (process.env.FAKE_ARGV) fs.writeFileSync(process.env.FAKE_ARGV, JSON.stringify(args));
+if (process.env.FAKE_STDOUT) process.stdout.write(process.env.FAKE_STDOUT);
 if (process.env.FAKE_EXIT) process.exit(Number(process.env.FAKE_EXIT));
 const mode = process.env.FAKE_MODE || args[0];
 if (mode === 'echo') { process.stdin.pipe(process.stdout); }
@@ -241,4 +242,11 @@ test('--help and --version', async () => {
   const version = await run(['--version'], baseEnv([]));
   assert.equal(version.code, 0);
   assert.equal(version.stdout.toString(), `tmgr-notify ${PKG_VERSION}\n`);
+});
+
+test('hook mode drops child stdout', async () => {
+  const { bin } = makeFake();
+  const res = await run(['hook', 'stop'], baseEnv([], { TMGR_BIN: bin, FAKE_STDOUT: 'noise', FAKE_EXIT: '0' }));
+  assert.equal(res.code, 0);
+  assert.equal(res.stdout.length, 0);
 });

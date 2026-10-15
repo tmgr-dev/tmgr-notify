@@ -154,3 +154,13 @@ test('chmod happens only after verification and only when not executable', async
   await resolveBinary(exec.deps);
   assert.deepEqual(exec.calls.chmod, []);
 });
+
+test('relative and empty PATH entries are never searched', async () => {
+  const { deps, calls } = makeDeps({
+    files: new Set(['tmgr', 'bin/tmgr', '/pkg/bin/tmgr']),
+    versions: { tmgr: 'tmgr 1.0.1', 'bin/tmgr': 'tmgr 1.0.1' },
+  });
+  deps.env = { PATH: ':.:bin' };
+  assert.equal((await resolveBinary(deps)).source, 'package');
+  assert.deepEqual(calls.probed, []);
+});

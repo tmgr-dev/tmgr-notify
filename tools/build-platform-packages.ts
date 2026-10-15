@@ -75,8 +75,7 @@ export function platformPackageJson(
     license: "AGPL-3.0-only",
     repository: {
       type: "git",
-      url: "git+https://github.com/tmgr-dev/frontend.git",
-      directory: "crates/tmgr-cli",
+      url: "git+https://github.com/tmgr-dev/tmgr-notify.git",
     },
     homepage: `https://github.com/${release.repo}/releases/tag/${release.tag}`,
     os: [entry.os],

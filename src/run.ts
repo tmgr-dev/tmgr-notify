@@ -4,7 +4,7 @@ const FORWARDED: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGHUP'];
 
 export function runBinary(bin: string, args: string[], forgiving = false): Promise<number> {
   return new Promise((resolve) => {
-    const child = spawn(bin, args, { stdio: 'inherit' });
+    const child = spawn(bin, args, { stdio: ['inherit', forgiving ? 'ignore' : 'inherit', 'inherit'] });
     const handlers = FORWARDED.map((sig) => {
       const handler = () => {
         child.kill(sig);

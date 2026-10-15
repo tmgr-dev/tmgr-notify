@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { accessSync, chmodSync, constants, createReadStream, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, dirname, isAbsolute, join } from 'node:path';
 
 export interface PlatformRelease {
   binarySha256: string;
@@ -66,7 +66,7 @@ export function isCompatible(version: [number, number, number], min: string): bo
 
 function findOnPath(deps: ResolveDeps): string | undefined {
   for (const dir of (deps.env.PATH ?? '').split(delimiter)) {
-    if (!dir) continue;
+    if (!isAbsolute(dir)) continue;
     const candidate = join(dir, 'tmgr');
     if (deps.isFile(candidate) && deps.isExecutable(candidate)) return candidate;
   }

@@ -117,4 +117,5 @@ test("platformPackageJson fields", () => {
   const pkg = platformPackageJson("darwin-arm64", rel.platforms["darwin-arm64"], rel, "1.0.0");
   assert.equal(pkg.name, "@tmgr/notify-darwin-arm64");
   assert.equal(pkg.homepage, "https://github.com/tmgr-dev/frontend/releases/tag/cli-v1.0.1");
+  assert.deepEqual(pkg.repository, { type: "git", url: "git+https://github.com/tmgr-dev/tmgr-notify.git" });
 });
