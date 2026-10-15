@@ -164,6 +164,10 @@ export async function buildPlatform(options: BuildOptions): Promise<string> {
   return pkgDir;
 }
 
+export function optionalDependencies(release: CliRelease, version: string): Record<string, string> {
+  return Object.fromEntries(Object.keys(release.platforms).map((key) => [`@tmgr/notify-${key}`, version]));
+}
+
 export async function loadInputs(): Promise<{ release: CliRelease; packageVersion: string }> {
   const root = new URL("../../", import.meta.url);
   const release = JSON.parse(
@@ -175,21 +179,31 @@ export async function loadInputs(): Promise<{ release: CliRelease; packageVersio
   return { release, packageVersion: pkg.version };
 }
 
-function parseArgs(argv: string[]): { out: string; only?: string } {
+function parseArgs(argv: string[]): { out: string; only?: string; addOptionalDeps: boolean } {
   let out = "dist-npm";
   let only: string | undefined;
+  let addOptionalDeps = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--out") out = argv[++i];
     else if (argv[i] === "--only") only = argv[++i];
+    else if (argv[i] === "--add-optional-deps") addOptionalDeps = true;
     else throw new Error(`unknown argument ${argv[i]}`);
   }
   if (!out) throw new Error("--out needs a value");
-  return { out, only };
+  return { out, only, addOptionalDeps };
 }
 
 async function main(): Promise<void> {
-  const { out, only } = parseArgs(process.argv.slice(2));
+  const { out, only, addOptionalDeps } = parseArgs(process.argv.slice(2));
   const { release, packageVersion } = await loadInputs();
+  if (addOptionalDeps) {
+    const path = fileURLToPath(new URL("../../package.json", import.meta.url));
+    const pkg = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+    pkg.optionalDependencies = optionalDependencies(release, packageVersion);
+    await writeFile(path, JSON.stringify(pkg, null, 2) + "\n");
+    console.log(`optionalDependencies -> ${JSON.stringify(pkg.optionalDependencies)}`);
+    return;
+  }
   const keys = only ? [only] : Object.keys(release.platforms);
   for (const key of keys) {
     const dir = await buildPlatform({ key, release, packageVersion, outDir: out });

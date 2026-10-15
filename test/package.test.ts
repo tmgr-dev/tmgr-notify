@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { optionalDependencies } from '../tools/build-platform-packages.js';
 
 const read = (name: string) => JSON.parse(readFileSync(new URL(`../../${name}`, import.meta.url), 'utf8'));
 
-test('optionalDependencies match the platforms in cli-release.json and the package version', () => {
+test('release optionalDependencies cover every pinned platform at the package version', () => {
   const pkg = read('package.json');
   const release = read('cli-release.json');
-  const expected = Object.keys(release.platforms).map((k) => `@tmgr/notify-${k}`).sort();
-  assert.deepEqual(Object.keys(pkg.optionalDependencies).sort(), expected);
-  for (const [name, version] of Object.entries(pkg.optionalDependencies)) {
-    assert.equal(version, pkg.version, name);
-  }
+  assert.deepEqual(optionalDependencies(release, pkg.version), {
+    '@tmgr/notify-darwin-arm64': pkg.version,
+    '@tmgr/notify-darwin-x64': pkg.version,
+    '@tmgr/notify-linux-arm64': pkg.version,
+    '@tmgr/notify-linux-x64': pkg.version,
+  });
 });
 
 test('package has no runtime dependencies and ships cli-release.json', () => {

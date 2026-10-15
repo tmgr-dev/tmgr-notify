@@ -46,12 +46,6 @@
     "test": "npm run build && node --test \"dist/test/*.test.js\"",
     "prepublishOnly": "npm test"
   },
-  "optionalDependencies": {
-    "@tmgr/notify-darwin-arm64": "1.0.0",
-    "@tmgr/notify-darwin-x64": "1.0.0",
-    "@tmgr/notify-linux-arm64": "1.0.0",
-    "@tmgr/notify-linux-x64": "1.0.0"
-  },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "typescript": "^5.7.0"
