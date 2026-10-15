@@ -1,0 +1,36 @@
+{
+  "repo": "tmgr-dev/frontend",
+  "tag": "cli-v1.0.1",
+  "version": "1.0.1",
+  "minVersion": "1.0.1",
+  "platforms": {
+    "darwin-arm64": {
+      "target": "aarch64-apple-darwin",
+      "os": "darwin",
+      "cpu": "arm64",
+      "archiveSha256": "446180263f217d5c35dc7316744a6131c70fd9b0a30bd24dc2572ffda09411f0",
+      "binarySha256": "ed56a66fede7c1dc4f54ae59ad39393a6abbf3b9b4bae08cbef176b3ba3c9b9b"
+    },
+    "darwin-x64": {
+      "target": "x86_64-apple-darwin",
+      "os": "darwin",
+      "cpu": "x64",
+      "archiveSha256": "0e038f69610429ce771a8b10c7c2ab638bba73ac9c9dd548837a491d82ee30cd",
+      "binarySha256": "e5220efadc87b6abcb28b0708e9bd3f03ef290f8d2b73b467bb767ca152b713e"
+    },
+    "linux-arm64": {
+      "target": "aarch64-unknown-linux-musl",
+      "os": "linux",
+      "cpu": "arm64",
+      "archiveSha256": "9b9df82ce51c88643fdecea109c74e2b1d2c4a9160d88466559ac5269c2ca2e2",
+      "binarySha256": "7ede72d662d84d95a33fd01cd34effa9185748060814be85cc7f2ceb87f4c7e1"
+    },
+    "linux-x64": {
+      "target": "x86_64-unknown-linux-musl",
+      "os": "linux",
+      "cpu": "x64",
+      "archiveSha256": "54db8374493e1072d7a88026ef65f4ca5032bb8b0e2228bad404668620366c34",
+      "binarySha256": "b7c8e6a4b19d72c37efb7d3766127b04af302735b96cb26883b4110985dc19e2"
+    }
+  }
+}
