@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { createReadStream } from 'node:fs';
-import { chmod, mkdir, open, rename, unlink } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { chmod, lstat, mkdir, open, rename, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { extractFiles } from './tar.js';
@@ -41,14 +41,36 @@ export function sha256Hex(data: Buffer): string {
   return createHash('sha256').update(data).digest('hex');
 }
 
-export function hashFile(path: string): Promise<string> {
-  return new Promise((resolve, reject) => {
+const MAX_BINARY_BYTES = 256 * 1024 * 1024;
+
+export async function hashFile(path: string): Promise<string> {
+  const fh = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const st = await fh.stat();
+    if (!st.isFile() || st.size > MAX_BINARY_BYTES) throw new ChecksumError(`${path} is not a regular file of a sane size`);
     const hash = createHash('sha256');
-    createReadStream(path)
-      .on('data', (c) => hash.update(c))
-      .on('error', reject)
-      .on('end', () => resolve(hash.digest('hex')));
-  });
+    for await (const chunk of fh.createReadStream({ autoClose: false })) hash.update(chunk as Buffer);
+    return hash.digest('hex');
+  } finally {
+    await fh.close();
+  }
+}
+
+export function redactUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.host}${u.pathname}`;
+  } catch {
+    return '<invalid url>';
+  }
+}
+
+export async function assertPrivateDir(dir: string): Promise<void> {
+  const st = await lstat(dir);
+  const uid = process.getuid?.();
+  if (!st.isDirectory() || (uid !== undefined && st.uid !== uid) || (st.mode & 0o022) !== 0) {
+    throw new ChecksumError(`${dir} must be a real directory owned by you and not writable by others; refusing to use it`);
+  }
 }
 
 export function parseSha256Sums(text: string, filename: string): string | undefined {
@@ -76,15 +98,15 @@ async function readCapped(res: Response, url: string, max: number): Promise<Buff
   const declared = Number(res.headers.get('content-length') ?? 0);
   if (declared > max) {
     await res.body?.cancel();
-    throw new Error(`response from ${url} is too large`);
+    throw new Error(`response from ${redactUrl(url)} is too large`);
   }
-  if (!res.body) throw new Error(`empty response from ${url}`);
+  if (!res.body) throw new Error(`empty response from ${redactUrl(url)}`);
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
     total += chunk.length;
     if (total > max) {
-      throw new Error(`response from ${url} is too large`);
+      throw new Error(`response from ${redactUrl(url)} is too large`);
     }
     chunks.push(Buffer.from(chunk));
   }
@@ -94,18 +116,18 @@ async function readCapped(res: Response, url: string, max: number): Promise<Buff
 async function get(url: string, opts: DownloadOptions, signal: AbortSignal, max: number): Promise<Buffer> {
   let current = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    if (new URL(current).protocol !== 'https:') throw new Error(`refusing non-https URL ${current}`);
+    if (new URL(current).protocol !== 'https:') throw new Error(`refusing non-https URL ${redactUrl(current)}`);
     const res = await opts.fetch(current, { redirect: 'manual', signal });
     if (REDIRECTS.has(res.status)) {
       const location = res.headers.get('location');
       await res.body?.cancel();
-      if (!location) throw new Error(`redirect without location from ${current}`);
+      if (!location) throw new Error(`redirect without location from ${redactUrl(current)}`);
       current = new URL(location, current).href;
       continue;
     }
     if (!res.ok) {
       await res.body?.cancel();
-      throw new Error(`HTTP ${res.status} from ${current}`);
+      throw new Error(`HTTP ${res.status} from ${redactUrl(current)}`);
     }
     return readCapped(res, current, max);
   }
@@ -151,6 +173,7 @@ async function fetchVerified(release: Release, pinned: PlatformRelease, opts: Do
 async function install(binary: Buffer, finalPath: string): Promise<void> {
   const dir = dirname(finalPath);
   await mkdir(dir, { recursive: true, mode: 0o700 });
+  await assertPrivateDir(dir);
   const tmp = join(dir, `.tmgr.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
   try {
     const fh = await open(tmp, 'wx', 0o600);
@@ -180,7 +203,10 @@ async function hashIfPresent(path: string, opts: DownloadOptions): Promise<strin
 export async function ensureCli(release: Release, pinned: PlatformRelease, opts: DownloadOptions): Promise<string> {
   const path = cliPath(opts.cacheRoot, release, pinned);
   const want = pinned.binarySha256.toLowerCase();
-  if ((await hashIfPresent(path, opts)) === want) return path;
+  if ((await hashIfPresent(path, opts)) === want) {
+    await assertPrivateDir(dirname(path));
+    return path;
+  }
 
   opts.log(`downloading tmgr ${release.version} for ${pinned.target} (first run)`);
   await install(await fetchVerified(release, pinned, opts), path);

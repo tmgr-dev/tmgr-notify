@@ -60,6 +60,7 @@ How the download is checked:
 - The binary is taken from the archive in memory and must match its own pinned SHA-256. No other archive entry is written.
 - It is installed atomically (temporary file, fsync, mode 755, rename), so two agents starting at once are safe.
 - Before every start `tmgr-notify` hashes the binary again and refuses to run it if the hash differs from the pin. A cached file that fails the check is replaced by a fresh verified download.
+- The cache directory must be a real directory owned by you and not writable by others, and the cached binary must be a regular file, not a symlink. Otherwise `tmgr-notify` refuses to start.
 
 There is no install script, so `npm install --ignore-scripts`, pnpm and `npx -y` all work. The first start needs network access to github.com and takes a few seconds; later starts are offline. Without network, or behind a proxy (Node's built-in `fetch` ignores `HTTPS_PROXY`), install the `tmgr` CLI from the release page and put it on `PATH`, or set `TMGR_BIN`.
 

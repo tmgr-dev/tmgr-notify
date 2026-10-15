@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
@@ -11,6 +12,7 @@ import {
   ensureCli,
   hashFile,
   parseSha256Sums,
+  redactUrl,
   sha256Hex,
   type DownloadOptions,
   type FetchFn,
@@ -229,4 +231,42 @@ test('parseSha256Sums reads text and binary-mode lines', () => {
   assert.equal(parseSha256Sums(`${h}  x.tgz\n${'b'.repeat(64)} *y.tgz\n`, 'x.tgz'), h);
   assert.equal(parseSha256Sums(`${'b'.repeat(64)} *y.tgz\n`, 'y.tgz'), 'b'.repeat(64));
   assert.equal(parseSha256Sums(`${h}  x.tgz\n`, 'z.tgz'), undefined);
+});
+
+function cachedPath(o: DownloadOptions, rel: Release): string {
+  const path = cliPath(o.cacheRoot, rel, rel.platforms.k);
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  return path;
+}
+
+test('a symlinked cached binary is refused even if its target is valid', async () => {
+  const rel = release();
+  const { fetch } = server(good());
+  const o = opts(fetch);
+  const target = join(o.cacheRoot, 'elsewhere');
+  writeFileSync(target, BIN);
+  symlinkSync(target, cachedPath(o, rel));
+  await assert.rejects(ensureCli(rel, rel.platforms.k, o), (err: NodeJS.ErrnoException) => err.code === 'ELOOP' || err.code === 'EMLINK');
+});
+
+test('a FIFO at the cache path is refused without hanging', async () => {
+  const rel = release();
+  const { fetch } = server(good());
+  const o = opts(fetch);
+  execFileSync('mkfifo', [cachedPath(o, rel)]);
+  await assert.rejects(ensureCli(rel, rel.platforms.k, o), ChecksumError);
+});
+
+test('a cache dir writable by others is refused', async () => {
+  const rel = release();
+  const { fetch } = server(good());
+  const o = opts(fetch);
+  const path = cachedPath(o, rel);
+  writeFileSync(path, BIN, { mode: 0o755 });
+  chmodSync(dirname(path), 0o777);
+  await assert.rejects(ensureCli(rel, rel.platforms.k, o), ChecksumError);
+});
+
+test('redactUrl drops query strings and credentials', () => {
+  assert.equal(redactUrl('https://u:p@objects.example.com/a/b?sig=secret#x'), 'https://objects.example.com/a/b');
 });
