@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 — UNRELEASED
+## 1.0.0 — 2026-10-15
 
 `@tmgr/notify` is now a thin launcher for the `tmgr` CLI 1.0.1 (`tmgr-dev/frontend`, `crates/tmgr-cli`), which implements the MCP server, the hooks and the commands.
 

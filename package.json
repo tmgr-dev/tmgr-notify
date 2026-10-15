@@ -1,6 +1,6 @@
 {
   "name": "@tmgr/notify",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "mcpName": "io.github.tmgr-dev/tmgr-notify",
   "type": "module",
   "description": "Thin launcher for the tmgr CLI: MCP server and Claude Code / Codex hooks for phone push notifications and urgent alarms for AI agents via TMGR",
@@ -47,10 +47,10 @@
     "prepublishOnly": "npm test"
   },
   "optionalDependencies": {
-    "@tmgr/notify-darwin-arm64": "0.2.0",
-    "@tmgr/notify-darwin-x64": "0.2.0",
-    "@tmgr/notify-linux-arm64": "0.2.0",
-    "@tmgr/notify-linux-x64": "0.2.0"
+    "@tmgr/notify-darwin-arm64": "1.0.0",
+    "@tmgr/notify-darwin-x64": "1.0.0",
+    "@tmgr/notify-linux-arm64": "1.0.0",
+    "@tmgr/notify-linux-x64": "1.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

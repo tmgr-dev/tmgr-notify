@@ -6,12 +6,12 @@
     "url": "https://github.com/tmgr-dev/tmgr-notify",
     "source": "github"
   },
-  "version": "0.2.0",
+  "version": "1.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@tmgr/notify",
-      "version": "0.2.0",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
       },
