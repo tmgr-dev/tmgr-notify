@@ -14,9 +14,9 @@ Kept from 0.2.0:
 
 New:
 
-- The `tmgr` binary is found through `TMGR_BIN`, then `tmgr` 1.x (1.0.1 or newer) on `PATH`, then the platform package `@tmgr/notify-{darwin-arm64,darwin-x64,linux-arm64,linux-x64}`.
-- Platform binaries are checked against SHA-256 hashes pinned in `cli-release.json` when the platform packages are built and again before every start. A mismatch stops `tmgr-notify` with an error; the binary is never run.
-- No install script and no download at run time: `--ignore-scripts`, pnpm and `npx -y` work.
+- The `tmgr` binary is found through `TMGR_BIN`, then `tmgr` 1.x (1.0.1 or newer) on `PATH`, then the user cache. On the first run the cache is filled by downloading the `cli-v1.0.1` release asset for darwin or linux, arm64 or x64.
+- Downloads are HTTPS only and checked against SHA-256 hashes for the archive and the binary pinned in `cli-release.json`, with the release `SHA256SUMS` as a cross-check. The binary is hashed again before every start. A mismatch stops `tmgr-notify` with an error; the binary is never run.
+- No install script: `--ignore-scripts`, pnpm and `npx -y` work.
 - `--help` and `--version`.
 - No runtime npm dependencies.
 
@@ -24,11 +24,11 @@ Migration notes:
 
 - `~/.config/tmgr-notify/env` must be mode 600 (`chmod 600 ~/.config/tmgr-notify/env`). The CLI ignores a file that other users can read; `tmgr-notify` prints a hint on stderr in that case.
 - Windows is not supported natively. Use WSL2, or stay on 0.2.0.
-- Installs with `--omit=optional` have no binary. Install the `tmgr` CLI or set `TMGR_BIN`.
+- The first start needs network access to github.com. Offline or behind a proxy, install the `tmgr` CLI or set `TMGR_BIN`.
 - `send` without `--body` uses the title as the text. Its output and error lines now come from `tmgr notify`.
 - The MCP server reports itself as `tmgr` in `serverInfo`.
 - Hooks also update agent work runs started with `tmgr agent start` when you are signed in to the CLI.
-- License: this package stays MIT; the binaries in the platform packages are AGPL-3.0-only.
+- License: this package stays MIT and ships no binary. The AGPL-3.0-only `tmgr` binary is downloaded from the CLI project's own release.
 
 
 ## 0.2.0 — 2026-10-04

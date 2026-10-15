@@ -51,11 +51,17 @@ If neither the env var nor the file provides a token, the CLI falls back to the 
 
 1. `TMGR_BIN`: an absolute path to a `tmgr` binary. Used as is.
 2. `tmgr` on `PATH`, when `tmgr --version` reports 1.0.1 or newer within 1.x.
-3. The prebuilt binary from the matching platform package, installed by npm as an optional dependency: `@tmgr/notify-darwin-arm64`, `@tmgr/notify-darwin-x64`, `@tmgr/notify-linux-arm64` or `@tmgr/notify-linux-x64`. The Linux builds are static (musl) and run on any distribution.
+3. A prebuilt binary in the user cache, `$XDG_CACHE_HOME/tmgr-notify/cli/1.0.1/<target>/tmgr` (default `~/.cache/...`). On the first run `tmgr-notify` downloads it from the [`cli-v1.0.1` release](https://github.com/tmgr-dev/frontend/releases/tag/cli-v1.0.1) of `tmgr-dev/frontend`, for macOS (arm64, x64) or Linux (arm64, x64; static musl builds that run on any distribution).
 
-The platform packages are built in this repository's release workflow from the `cli-v1.0.1` GitHub release of `tmgr-dev/frontend`. The workflow checks every archive against SHA-256 hashes pinned in [`cli-release.json`](cli-release.json) and against the release's `SHA256SUMS`, then publishes with npm provenance. `cli-release.json` ships in this package too: before every start `tmgr-notify` hashes the platform binary and refuses to run it if the hash differs from the pinned one.
+How the download is checked:
 
-Nothing is downloaded at run time and there is no install script, so `npm install --ignore-scripts`, pnpm and `npx -y` all work. If optional dependencies were omitted (`--omit=optional`), install the `tmgr` CLI from the [release page](https://github.com/tmgr-dev/frontend/releases/tag/cli-v1.0.1) or set `TMGR_BIN`.
+- HTTPS only, on every redirect, from the exact `cli-v1.0.1` tag, never "latest".
+- The archive must match the SHA-256 pinned in [`cli-release.json`](cli-release.json), which ships inside this package. The release's `SHA256SUMS` must agree with that pin.
+- The binary is taken from the archive in memory and must match its own pinned SHA-256. No other archive entry is written.
+- It is installed atomically (temporary file, fsync, mode 755, rename), so two agents starting at once are safe.
+- Before every start `tmgr-notify` hashes the binary again and refuses to run it if the hash differs from the pin. A cached file that fails the check is replaced by a fresh verified download.
+
+There is no install script, so `npm install --ignore-scripts`, pnpm and `npx -y` all work. The first start needs network access to github.com and takes a few seconds; later starts are offline. Without network, or behind a proxy (Node's built-in `fetch` ignores `HTTPS_PROXY`), install the `tmgr` CLI from the release page and put it on `PATH`, or set `TMGR_BIN`.
 
 ## Claude Code
 
@@ -281,8 +287,8 @@ npm ci
 npm test
 ```
 
-`npm test` compiles `src/`, `tools/` and `test/` to `dist/` and runs the `node:test` suite without network calls; the end-to-end tests use a fake `tmgr`. `node dist/tools/smoke.js` builds the platform package for the current machine from the real CLI release, installs it with the main package into a temporary project and runs an MCP handshake.
+`npm test` compiles `src/`, `tools/` and `test/` to `dist/` and runs the `node:test` suite without network calls; the end-to-end tests use a fake `tmgr`. `node dist/tools/smoke.js` packs the package, installs it with npm and pnpm (`--ignore-scripts`) into temporary projects, and runs two concurrent first starts that download the real CLI release into an empty cache, then an MCP handshake.
 
 ## License
 
-The `@tmgr/notify` package is MIT. The `tmgr` binaries in the `@tmgr/notify-<platform>` packages are AGPL-3.0-only; each platform package carries the CLI's `LICENSE` and links to its source.
+The `@tmgr/notify` package is MIT and contains no `tmgr` binary. The `tmgr` CLI is AGPL-3.0-only; `tmgr-notify` downloads it at run time from the CLI project's own GitHub release, which ships the license and points to the [source](https://github.com/tmgr-dev/frontend/tree/cli-v1.0.1/crates/tmgr-cli).
