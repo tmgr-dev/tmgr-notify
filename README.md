@@ -10,9 +10,12 @@ MCP server and Claude Code / Codex hook CLI that lets an AI agent reach you on y
 
 The package also ships hooks that notify you automatically when Claude Code needs input or finishes a long turn, and when a Codex turn completes.
 
+Since 1.0 the package is a thin launcher for the [`tmgr` command line tool](https://github.com/tmgr-dev/frontend/tree/cli-v1.0.1/crates/tmgr-cli), which implements the MCP server, the hooks and the commands. Commands, tool names, tool parameters and configuration stay the same as in 0.2.0. See [How the `tmgr` binary is found](#how-the-tmgr-binary-is-found).
+
 ## Requirements
 
 - Node 22 or newer
+- macOS (Apple silicon or Intel) or Linux (arm64 or x64). Windows is not supported natively; use WSL2.
 - A TMGR account
 - The TMGR mobile app, for push notifications and for alarms (AlarmKit)
 
@@ -38,7 +41,21 @@ If a variable is not set, `tmgr-notify` reads it from `~/.config/tmgr-notify/env
 TMGR_NOTIFY_TOKEN=<TMGR_NOTIFY_TOKEN>
 ```
 
-The file holds a bearer token, so restrict it: `chmod 600 ~/.config/tmgr-notify/env`.
+The file holds a bearer token, so restrict it: `chmod 600 ~/.config/tmgr-notify/env`. Since 1.0 this is required: the `tmgr` CLI ignores the file unless it is a regular file owned by you with mode 600, and `tmgr-notify` prints a `chmod 600` hint on stderr when it sees a looser file.
+
+If neither the env var nor the file provides a token, the CLI falls back to the account you signed in with `tmgr login`.
+
+## How the `tmgr` binary is found
+
+`tmgr-notify` runs the first match:
+
+1. `TMGR_BIN`: an absolute path to a `tmgr` binary. Used as is.
+2. `tmgr` on `PATH`, when `tmgr --version` reports 1.0.1 or newer within 1.x.
+3. The prebuilt binary from the matching platform package, installed by npm as an optional dependency: `@tmgr/notify-darwin-arm64`, `@tmgr/notify-darwin-x64`, `@tmgr/notify-linux-arm64` or `@tmgr/notify-linux-x64`. The Linux builds are static (musl) and run on any distribution.
+
+The platform packages are built in this repository's release workflow from the `cli-v1.0.1` GitHub release of `tmgr-dev/frontend`. The workflow checks every archive against SHA-256 hashes pinned in [`cli-release.json`](cli-release.json) and against the release's `SHA256SUMS`, then publishes with npm provenance. `cli-release.json` ships in this package too: before every start `tmgr-notify` hashes the platform binary and refuses to run it if the hash differs from the pinned one.
+
+Nothing is downloaded at run time and there is no install script, so `npm install --ignore-scripts`, pnpm and `npx -y` all work. If optional dependencies were omitted (`--omit=optional`), install the `tmgr` CLI from the [release page](https://github.com/tmgr-dev/frontend/releases/tag/cli-v1.0.1) or set `TMGR_BIN`.
 
 ## Claude Code
 
@@ -113,7 +130,7 @@ Hooks live in `~/.claude/settings.json` (user scope shown, project scope works t
 What each hook does:
 
 - `Notification` (needs your input, permission, or idle prompt): sends a high-priority push titled `Claude Code · <project> · needs you`, with the first line of the message as the body. This event fires for more than permission prompts, so the wording is generic ("needs your attention"). The types `auth_success`, `elicitation_complete` and `elicitation_response` are skipped.
-- `UserPromptSubmit`: records the turn start time in a per-session state file under `~/.cache/tmgr-notify/` (falls back to the OS temp directory). No network call.
+- `UserPromptSubmit`: records the turn start time in a per-session state file. No push is sent.
 - `Stop`: does nothing if `stop_hook_active` is true. Otherwise it reads the recorded turn start; if that is missing it falls back to the last user prompt timestamp in the transcript (best effort). If the turn lasted at least `TMGR_NOTIFY_STOP_MIN_MINUTES` (default 5) it sends a normal-priority push titled `Claude Code · <project> · done`, with the first line of the last assistant message as the body.
 
 `<project>` is the basename of the working directory.
@@ -214,19 +231,22 @@ A full default escalation (3 attempts) takes about 6 minutes; 5 attempts take ab
 npx -y @tmgr/notify send --title "Deploy finished" --body "v1.2.3 is live" --priority high [--link https://example.com]
 ```
 
-Exits non-zero and prints an `error: ...` line on failure (auth, validation, rate limit, timeout, network).
+`send` runs `tmgr notify`. Without `--body` the title is also used as the text, because a push needs a text. Exits non-zero and prints an error on failure (auth, validation, rate limit, timeout, network).
 
 ```bash
 npx -y @tmgr/notify alarm "prod DB is down" --title "Prod down" [--no-wait] [--ack-timeout 90] [--delivery-timeout 30] [--no-call] [--call-attempts 3]
 ```
 
-The default title is `Alarm`. `--no-call` disables the voice-call fallback. It prints each status change and the final status. The exit code is `0` only when the alarm was acknowledged (with `--no-wait`, `0` once the alarm is created).
+`alarm` runs `tmgr alarm` with the same flags. The default title is `Alarm`. `--no-call` disables the voice-call fallback. It prints each status change and the final status. The exit code is `0` only when the alarm was acknowledged (with `--no-wait`, `0` once the alarm is created).
 
 ```bash
 npx -y @tmgr/notify mcp                       # MCP server over stdio (also the default with no arguments)
 npx -y @tmgr/notify hook notification|prompt|stop   # Claude Code hooks, payload on stdin
 npx -y @tmgr/notify hook codex '<event json>'       # Codex notify, payload as last argument
+npx -y @tmgr/notify --help | --version
 ```
+
+If you install the `tmgr` CLI itself you can also call it directly: `tmgr mcp`, `tmgr notify`, `tmgr alarm`, `tmgr hook claude <event>`, `tmgr hook codex`.
 
 To test the backend independently of this CLI:
 
@@ -261,8 +281,8 @@ npm ci
 npm test
 ```
 
-`npm test` compiles `src/` and `test/` to `dist/` and runs the `node:test` suite. No network calls are made; the HTTP client tests use a local server.
+`npm test` compiles `src/`, `tools/` and `test/` to `dist/` and runs the `node:test` suite without network calls; the end-to-end tests use a fake `tmgr`. `node dist/tools/smoke.js` builds the platform package for the current machine from the real CLI release, installs it with the main package into a temporary project and runs an MCP handshake.
 
 ## License
 
-MIT
+The `@tmgr/notify` package is MIT. The `tmgr` binaries in the `@tmgr/notify-<platform>` packages are AGPL-3.0-only; each platform package carries the CLI's `LICENSE` and links to its source.
