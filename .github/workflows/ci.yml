@@ -35,5 +35,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm install -g pnpm@9.15.9
       - run: npm run build
       - run: node dist/tools/smoke.js
